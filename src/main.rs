@@ -6,8 +6,8 @@ mod logic {
     pub enum Token {
         And,
         Or,
-        Impl,
-        BiImpl,
+        Impls,
+        BiImpls,
         Not,
         Var(u32),
     }
@@ -58,8 +58,8 @@ mod logic {
             match *self {
                 Token::And => String::from("^"),
                 Token::Or => String::from("v"),
-                Token::Impl => String::from("=>"),
-                Token::BiImpl => String::from("<=>"),
+                Token::Impls => String::from("=>"),
+                Token::BiImpls => String::from("<=>"),
                 Token::Not => String::from("!"),
 
                 Token::Var(index) => match index {
@@ -107,13 +107,13 @@ mod logic {
                     }
 
                     2 => {
-                        self.push_tok(Token::Impl);
+                        self.push_tok(Token::Impls);
                         self.gen_expr(rng, depth - 1);
                         self.gen_expr(rng, depth - 1);
                     }
 
                     3 => {
-                        self.push_tok(Token::BiImpl);
+                        self.push_tok(Token::BiImpls);
                         self.gen_expr(rng, depth - 1);
                         self.gen_expr(rng, depth - 1);
                     }
@@ -138,9 +138,38 @@ mod logic {
             self.token_vec.push(token);
         }
 
+        pub fn truth_values(&self) {}
 
-        pub fn truth_values(&self) {
-                        
+        pub fn truth_table(&self) {
+            let mut truth_table: Vec<Vec<bool>> = Vec::new();
+
+            for i in 0..(2_u32.pow(self.num_of_var)) {
+                truth_table.push(Vec::new());
+
+                for j in (0..self.num_of_var).rev() {
+                    truth_table[i as usize].push((i % 2_u32.pow(j + 1)) / 2_u32.pow(j) == 0);
+                }
+            }
+        }
+
+        fn and(a: bool, b: bool) -> bool {
+            a & b
+        }
+
+        fn or(a: bool, b: bool) -> bool {
+            a | b
+        }
+
+        fn impls(a: bool, b: bool) -> bool {
+            !a | b
+        }
+
+        fn bi_impls(a: bool, b: bool) -> bool {
+            !(a ^ b)
+        }
+
+        fn not(a: bool) -> bool {
+            !a
         }
 
         pub fn new(num_of_var: u32) -> Expression {
@@ -169,5 +198,6 @@ fn main() {
 
     let mut expr = Expression::new(3);
     expr.gen_expr(&mut rand::thread_rng(), 3);
+    expr.line(4);
     println!("{}", expr);
 }
