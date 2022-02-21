@@ -2,7 +2,7 @@ mod logic {
     use rand::{rngs::ThreadRng, Rng};
     use std::fmt;
 
-    #[derive(PartialEq, PartialOrd, Eq, Debug)]
+    #[derive(PartialEq, PartialOrd, Eq, Debug, Copy, Clone)]
     pub enum Token {
         And,
         Or,
@@ -10,6 +10,7 @@ mod logic {
         BiImpls,
         Not,
         Var(u32),
+        Bool(bool),
     }
 
     pub struct TokenError;
@@ -56,33 +57,35 @@ mod logic {
 
         fn get_symbol(&self) -> String {
             match *self {
-                Token::And => String::from("^"),
-                Token::Or => String::from("v"),
-                Token::Impls => String::from("=>"),
-                Token::BiImpls => String::from("<=>"),
-                Token::Not => String::from("!"),
+                Token::And => "^".to_string(),
+                Token::Or => "v".to_string(),
+                Token::Impls => "=>".to_string(),
+                Token::BiImpls => "<=>".to_string(),
+                Token::Not => "!".to_string(),
 
                 Token::Var(index) => match index {
-                    0 => String::from("P"),
-                    1 => String::from("Q"),
-                    2 => String::from("R"),
-                    3 => String::from("S"),
-                    4 => String::from("T"),
+                    0 => "P".to_string(),
+                    1 => "Q".to_string(),
+                    2 => "R".to_string(),
+                    3 => "S".to_string(),
+                    4 => "T".to_string(),
                     index => format!("A{}", index),
                 },
+
+                Token::Bool(value) => value.to_string(),
             }
         }
     }
 
     pub struct Expression {
-        num_of_var: u32,
+        var_count: u32,
         token_vec: Vec<Token>,
         expr_string: String,
     }
 
     impl fmt::Display for Expression {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-            write!(f, "{}", self.expr_string)
+            write!(f, "{:?}", self.token_vec)
         }
     }
 
@@ -95,42 +98,42 @@ mod logic {
             if depth != 1 {
                 match rng.gen_range(0..6) {
                     0 => {
+                        self.gen_expr(rng, depth - 1);
+                        self.gen_expr(rng, depth - 1);
                         self.push_tok(Token::And);
-                        self.gen_expr(rng, depth - 1);
-                        self.gen_expr(rng, depth - 1);
                     }
 
                     1 => {
+                        self.gen_expr(rng, depth - 1);
+                        self.gen_expr(rng, depth - 1);
                         self.push_tok(Token::Or);
-                        self.gen_expr(rng, depth - 1);
-                        self.gen_expr(rng, depth - 1);
                     }
 
                     2 => {
+                        self.gen_expr(rng, depth - 1);
+                        self.gen_expr(rng, depth - 1);
                         self.push_tok(Token::Impls);
-                        self.gen_expr(rng, depth - 1);
-                        self.gen_expr(rng, depth - 1);
                     }
 
                     3 => {
+                        self.gen_expr(rng, depth - 1);
+                        self.gen_expr(rng, depth - 1);
                         self.push_tok(Token::BiImpls);
-                        self.gen_expr(rng, depth - 1);
-                        self.gen_expr(rng, depth - 1);
                     }
 
                     4 => {
-                        self.push_tok(Token::Not);
                         self.gen_expr(rng, depth - 1);
+                        self.push_tok(Token::Not);
                     }
 
                     5 => {
-                        self.push_tok(Token::Var(rng.gen_range(0..self.num_of_var)));
+                        self.push_tok(Token::Var(rng.gen_range(0..self.var_count)));
                     }
 
-                    _ => panic!("invalid random number"),
+                    _ => (),
                 }
             } else {
-                self.push_tok(Token::Var(rng.gen_range(0..self.num_of_var)));
+                self.push_tok(Token::Var(rng.gen_range(0..self.var_count)));
             }
         }
 
@@ -138,43 +141,122 @@ mod logic {
             self.token_vec.push(token);
         }
 
-        pub fn truth_values(&self) {}
+        pub fn truth_table(&mut self) {
+            let mut result = Vec::new();
 
-        pub fn truth_table(&self) {
-            let mut truth_table: Vec<Vec<bool>> = Vec::new();
+            let mut interpretation = vec![false; self.var_count as usize];
 
-            for i in 0..(2_u32.pow(self.num_of_var)) {
-                truth_table.push(Vec::new());
+            let mut value_stack = Vec::new();
 
-                for j in (0..self.num_of_var).rev() {
-                    truth_table[i as usize].push((i % 2_u32.pow(j + 1)) / 2_u32.pow(j) == 0);
+            for i in 0..(2_usize.pow(self.var_count)) {
+                let mut token_vec = self.token_vec.clone();
+
+                for j in (0..self.var_count).rev() {
+                    interpretation[(self.var_count - j - 1) as usize] = (i % 2_usize.pow(j + 1)) / 2_usize.pow(j) == 0;
                 }
+
+                for j in 0..self.token_vec.len() {
+                    token_vec[j] = match self.token_vec[j] {
+                        Token::Var(index) => Token::Bool(interpretation[index as usize]),
+                        oper => oper // assuming token is an operator
+                    }
+                }
+
+                for token in token_vec {
+                    let mut value: bool;
+
+                    match token {
+                        Token::Bool(value) => value_stack.push(value),
+                        Token::And => {
+                            value = Expression::and(value_stack.pop(), value_stack.pop());
+                            value_stack.push(value);
+                        },
+                        Token::Or => {
+                            value = Expression::or(value_stack.pop(), value_stack.pop());
+                            value_stack.push(value);
+                        },
+                        Token::Impls => {
+                            value = Expression::impls(value_stack.pop(), value_stack.pop());
+                            value_stack.push(value);
+                        },
+                        Token::BiImpls => {
+                            value = Expression::bi_impls(value_stack.pop(), value_stack.pop());
+                            value_stack.push(value);
+                        },
+                        Token::Not => {
+                            value = Expression::not(value_stack.pop());
+                            value_stack.push(value);
+                        },
+
+                        Token::Var(_) => panic!("variable is not allowed"),
+                    }
+
+                }
+
+                result.push(match value_stack.pop() {
+                    Some(value) => value,
+                    None => panic!("no last element"),
+                });
+            }
+
+            println!("{:#?}", result);
+        }
+
+        fn and(a: Option<bool>, b: Option<bool>) -> bool {
+            match a {
+                Some(a) => match b {
+                    Some(b) => a & b,
+                    None => panic!("invalid option"),
+                },
+
+                None => panic!("invalid option"),
             }
         }
 
-        fn and(a: bool, b: bool) -> bool {
-            a & b
+        fn or(a: Option<bool>, b: Option<bool>) -> bool {
+            match a {
+                Some(a) => match b {
+                    Some(b) => a | b,
+                    None => panic!("invalid option"),
+                },
+
+                None => panic!("invalid option"),
+            }
         }
 
-        fn or(a: bool, b: bool) -> bool {
-            a | b
+        fn impls(a: Option<bool>, b: Option<bool>) -> bool {
+            match a {
+                Some(a) => match b {
+                    Some(b) => !a | b,
+                    None => panic!("invalid option"),
+                },
+
+                None => panic!("invalid option"),
+            }
         }
 
-        fn impls(a: bool, b: bool) -> bool {
-            !a | b
+        fn bi_impls(a: Option<bool>, b: Option<bool>) -> bool {
+
+            match a {
+                Some(a) => match b {
+                    Some(b) => !(a ^ b),
+                    None => panic!("invalid option"),
+                },
+
+                None => panic!("invalid option"),
+            }
         }
 
-        fn bi_impls(a: bool, b: bool) -> bool {
-            !(a ^ b)
+        fn not(a: Option<bool>) -> bool {
+            match a {
+                Some(a) => !a,
+                None => panic!("invalid option"),
+            }
         }
 
-        fn not(a: bool) -> bool {
-            !a
-        }
-
-        pub fn new(num_of_var: u32) -> Expression {
+        pub fn new(var_count: u32) -> Expression {
             Expression {
-                num_of_var,
+                var_count,
                 token_vec: Vec::<Token>::new(),
                 expr_string: String::new(),
             }
@@ -198,6 +280,6 @@ fn main() {
 
     let mut expr = Expression::new(3);
     expr.gen_expr(&mut rand::thread_rng(), 3);
-    expr.line(4);
+    expr.truth_table();
     println!("{}", expr);
 }
