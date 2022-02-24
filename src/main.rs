@@ -90,6 +90,53 @@ mod logic {
     }
 
     impl Expression {
+        pub fn gen_expr2(&mut self, rng: &mut ThreadRng, depth: u32) {
+            let mut count = 1;
+            let mut current_depth = 0;
+            let mut depth_stack = Vec::new();
+
+            while count != 0 {
+                if current_depth == depth {
+
+                } else {
+                    match rng.gen_range(0..6) {
+                        0 => {
+                            count += 1;
+                            depth_stack
+                            // self.push_tok(Token::And);
+                        }
+
+                        1 => {
+                            count += 1;
+                            // self.push_tok(Token::Or);
+                        }
+
+                        2 => {
+                            count += 1;
+                            // self.push_tok(Token::Impls);
+                        }
+
+                        3 => {
+                            count += 1;
+                            // self.push_tok(Token::BiImpls);
+                        }
+
+                        4 => {
+                            count += 0;
+                            // self.push_tok(Token::Not);
+                        }
+
+                        5 => {
+                            count += -1;
+                            // self.push_tok(Token::Var(rng.gen_range(0..self.var_count)));
+                        }
+
+                        _ => (),
+                    }
+                }
+            }
+        }
+
         pub fn gen_expr(&mut self, rng: &mut ThreadRng, depth: u8) {
             if depth == 0 {
                 panic!("depth cannot be 0");
@@ -152,13 +199,14 @@ mod logic {
                 let mut token_vec = self.token_vec.clone();
 
                 for j in (0..self.var_count).rev() {
-                    interpretation[(self.var_count - j - 1) as usize] = (i % 2_usize.pow(j + 1)) / 2_usize.pow(j) == 0;
+                    interpretation[(self.var_count - j - 1) as usize] =
+                        (i % 2_usize.pow(j + 1)) / 2_usize.pow(j) == 0;
                 }
 
                 for j in 0..self.token_vec.len() {
                     token_vec[j] = match self.token_vec[j] {
                         Token::Var(index) => Token::Bool(interpretation[index as usize]),
-                        oper => oper // assuming token is an operator
+                        oper => oper, // assuming token is an operator
                     }
                 }
 
@@ -170,27 +218,26 @@ mod logic {
                         Token::And => {
                             value = Expression::and(value_stack.pop(), value_stack.pop());
                             value_stack.push(value);
-                        },
+                        }
                         Token::Or => {
                             value = Expression::or(value_stack.pop(), value_stack.pop());
                             value_stack.push(value);
-                        },
+                        }
                         Token::Impls => {
                             value = Expression::impls(value_stack.pop(), value_stack.pop());
                             value_stack.push(value);
-                        },
+                        }
                         Token::BiImpls => {
                             value = Expression::bi_impls(value_stack.pop(), value_stack.pop());
                             value_stack.push(value);
-                        },
+                        }
                         Token::Not => {
                             value = Expression::not(value_stack.pop());
                             value_stack.push(value);
-                        },
+                        }
 
                         Token::Var(_) => panic!("variable is not allowed"),
                     }
-
                 }
 
                 result.push(match value_stack.pop() {
@@ -236,7 +283,6 @@ mod logic {
         }
 
         fn bi_impls(a: Option<bool>, b: Option<bool>) -> bool {
-
             match a {
                 Some(a) => match b {
                     Some(b) => !(a ^ b),
