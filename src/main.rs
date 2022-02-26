@@ -90,7 +90,65 @@ mod logic {
     }
 
     impl Expression {
-        pub fn gen_expr(&mut self, rng: &mut ThreadRng, depth: u8) {
+        pub fn random(&mut self, rng: &mut ThreadRng, depth: u32) {
+            let mut count: u32 = 1;
+            let mut var_count: u32 = 0;
+            let mut current_depth: u32 = 1;
+            let mut depth_stack: Vec<u32> = Vec::new();
+
+            while count != 0 {
+                if current_depth == depth {
+                    count -= 1;
+                    current_depth = depth_stack.pop().unwrap_or(current_depth);
+
+                    self.push_tok(Token::Var(var_count));
+
+                    var_count += 1;
+                } else {
+                    match rng.gen_range(0..6) {
+                        value if (value >= 0 && value <= 3) => {
+                            // And, Or, Implies, Bi-implies
+                            count += 1;
+                            current_depth += 1;
+                            depth_stack.push(current_depth);
+
+                            match value {
+                                0 => self.push_tok(Token::And),
+                                1 => self.push_tok(Token::Or),
+                                2 => self.push_tok(Token::Impls),
+                                3 => self.push_tok(Token::BiImpls),
+                                _ => (),
+                            }
+                        }
+
+                        4 => {
+                            // Not
+                            count += 0;
+                            current_depth += 1;
+
+                            self.push_tok(Token::Not);
+                        }
+
+                        5 => {
+                            // Variable
+                            count -= 1;
+                            current_depth = depth_stack.pop().unwrap_or(current_depth);
+
+                            self.push_tok(Token::Var(var_count));
+
+                            var_count += 1;
+                        }
+
+                        _ => (),
+                    }
+                }
+            }
+
+            self.var_count = var_count;
+            self.token_vec.reverse();
+        }
+
+        pub fn gen_expr(&mut self, rng: &mut ThreadRng, depth: u32) {
             if depth == 0 {
                 panic!("depth cannot be 0");
             }
@@ -128,12 +186,14 @@ mod logic {
 
                     5 => {
                         self.push_tok(Token::Var(rng.gen_range(0..self.var_count)));
+                        // self.push_tok(Token::Var(depth));
                     }
 
                     _ => (),
                 }
             } else {
                 self.push_tok(Token::Var(rng.gen_range(0..self.var_count)));
+                // self.push_tok(Token::Var(depth));
             }
         }
 
@@ -152,45 +212,42 @@ mod logic {
                 let mut token_vec = self.token_vec.clone();
 
                 for j in (0..self.var_count).rev() {
-                    interpretation[(self.var_count - j - 1) as usize] = (i % 2_usize.pow(j + 1)) / 2_usize.pow(j) == 0;
+                    interpretation[(self.var_count - j - 1) as usize] =
+                        (i % 2_usize.pow(j + 1)) / 2_usize.pow(j) == 0;
                 }
 
                 for j in 0..self.token_vec.len() {
                     token_vec[j] = match self.token_vec[j] {
                         Token::Var(index) => Token::Bool(interpretation[index as usize]),
-                        oper => oper // assuming token is an operator
+                        oper => oper, // assuming token is an operator
                     }
                 }
 
                 for token in token_vec {
-                    let mut value: bool;
+                    let value: bool;
 
                     match token {
-                        Token::Bool(value) => value_stack.push(value),
-                        Token::And => {
-                            value = Expression::and(value_stack.pop(), value_stack.pop());
-                            value_stack.push(value);
-                        },
-                        Token::Or => {
-                            value = Expression::or(value_stack.pop(), value_stack.pop());
-                            value_stack.push(value);
-                        },
+                        Token::Bool(boolean) => value = boolean,
+
+                        Token::And => value = Expression::and(value_stack.pop(), value_stack.pop()),
+
+                        Token::Or => value = Expression::or(value_stack.pop(), value_stack.pop()),
+
                         Token::Impls => {
-                            value = Expression::impls(value_stack.pop(), value_stack.pop());
-                            value_stack.push(value);
-                        },
+                            value = Expression::impls(value_stack.pop(), value_stack.pop())
+                        }
+
                         Token::BiImpls => {
                             value = Expression::bi_impls(value_stack.pop(), value_stack.pop());
-                            value_stack.push(value);
-                        },
-                        Token::Not => {
-                            value = Expression::not(value_stack.pop());
-                            value_stack.push(value);
-                        },
+                            // value_stack.push(Expression::bi_impls(value_stack.pop(), value_stack.pop()));
+                        }
+
+                        Token::Not => value = Expression::not(value_stack.pop()),
 
                         Token::Var(_) => panic!("variable is not allowed"),
                     }
 
+                    value_stack.push(value);
                 }
 
                 result.push(match value_stack.pop() {
@@ -236,7 +293,6 @@ mod logic {
         }
 
         fn bi_impls(a: Option<bool>, b: Option<bool>) -> bool {
-
             match a {
                 Some(a) => match b {
                     Some(b) => !(a ^ b),
@@ -254,9 +310,9 @@ mod logic {
             }
         }
 
-        pub fn new(var_count: u32) -> Expression {
+        pub fn new() -> Expression {
             Expression {
-                var_count,
+                var_count: 0,
                 token_vec: Vec::<Token>::new(),
                 expr_string: String::new(),
             }
@@ -278,8 +334,10 @@ fn main() {
 
     // println!("{}", variable);
 
-    let mut expr = Expression::new(3);
-    expr.gen_expr(&mut rand::thread_rng(), 3);
+    let mut expr = Expression::new();
+    // expr.gen_expr(&mut rand::thread_rng(), 3);
+    expr.random(&mut rand::thread_rng(), 6);
+    println!("{}", expr);
     expr.truth_table();
     println!("{}", expr);
 }
