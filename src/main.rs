@@ -148,7 +148,8 @@ mod logic {
             self.token_vec.reverse();
         }
 
-        pub fn gen_expr(&mut self, rng: &mut ThreadRng, depth: u32) {
+
+        pub fn gen_expr(&mut self, rng: &mut ThreadRng, depth: u8) {
             if depth == 0 {
                 panic!("depth cannot be 0");
             }
@@ -246,8 +247,6 @@ mod logic {
 
                         Token::Var(_) => panic!("variable is not allowed"),
                     }
-
-                    value_stack.push(value);
                 }
 
                 result.push(match value_stack.pop() {
